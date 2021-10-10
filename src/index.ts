@@ -1,10 +1,35 @@
 require("dotenv").config();
-import { App, LogLevel, SayFn } from "@slack/bolt";
+import { App, LogLevel, SayFn, SlashCommand } from "@slack/bolt";
 
-const globalTimer: { [key: string]: NodeJS.Timer | null } = {};
-const stopText = ["stop", "止めて", "もういい", "やめて", "とめて", "うるさい"];
+const globalTimer: {
+  [channelId: string]: {
+    timer: NodeJS.Timer | null;
+    count: number;
+  };
+} = {};
 
-// Initializes your app with your bot token and signing secret
+const stopGrill = async (command: SlashCommand, say: SayFn) => {
+  await say("ん");
+  const { timer } = globalTimer[command.channel_id];
+  if (timer) {
+    clearInterval(timer);
+  }
+};
+
+const grillThere = async (command: SlashCommand, say: SayFn) => {
+  const interval = setInterval(async () => {
+    await say("ねえ");
+    if (globalTimer[command.channel_id]) {
+      globalTimer[command.channel_id].count += 1;
+    }
+  }, 1 * 1000);
+
+  globalTimer[command.channel_id] = {
+    timer: interval,
+    count: 0,
+  };
+};
+
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
@@ -17,17 +42,18 @@ app.command("/menhera", async ({ command, ack, say, respond }) => {
   });
 
   const { text } = command;
+  const stopText = [
+    "stop",
+    "止めて",
+    "もういい",
+    "やめて",
+    "とめて",
+    "うるさい",
+  ];
   if (stopText.includes(text)) {
-    await say("ん");
-    const timer = globalTimer[command.user_id];
-    if (timer) {
-      clearInterval(timer);
-    }
+    await stopGrill(command, say);
   } else {
-    const interval = setInterval(async () => {
-      await say("ねえ");
-    }, 1 * 1000);
-    globalTimer[command.user_id] = interval;
+    await grillThere(command, say);
   }
 });
 
